@@ -2,9 +2,8 @@ package org.t246osslab.easybuggy4sb.vulnerabilities;
 
 import java.util.Locale;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonParseException;
 
 import org.apache.commons.lang.StringUtils;
 import org.springframework.stereotype.Controller;
@@ -30,23 +29,23 @@ public class CodeInjectionController extends AbstractController {
 	}
 
     private void parseJson(String jsonString, ModelAndView mav, Locale locale) {
-        /* Remove spaces and line breaks to parse as JSON */
-        String convertedJsonString = jsonString.replaceAll(" ", "");
-        convertedJsonString = convertedJsonString.replaceAll("\r\n", "");
-        convertedJsonString = convertedJsonString.replaceAll("\n", "");
         try {
-            /* Parse the input string as JSON */
-        	ScriptEngineManager manager = new ScriptEngineManager();
-        	ScriptEngine scriptEngine = manager.getEngineByName("JavaScript");
-        	scriptEngine.eval("JSON.parse('" + convertedJsonString + "')");
-        	mav.addObject("msg", msg.getMessage("msg.valid.json", null, locale));
-        } catch (ScriptException e) {
-        	mav.addObject("errmsg", msg.getMessage("msg.invalid.json",
-        			new String[] { e.getMessage() }, null, locale));
+            /*
+             * Parse the input string as JSON using Gson's safe JsonParser.
+             * This replaces the previous ScriptEngine.eval() approach which was
+             * vulnerable to code injection (CWE-94) because it passed user-controlled
+             * input directly to a JavaScript eval() call.
+             * JsonParser.parseString() is a pure data parser with no code execution.
+             */
+            JsonParser.parseString(jsonString);
+            mav.addObject("msg", msg.getMessage("msg.valid.json", null, locale));
+        } catch (JsonParseException e) {
+            mav.addObject("errmsg", msg.getMessage("msg.invalid.json",
+                    new String[] { e.getMessage() }, null, locale));
         } catch (Exception e) {
-        	log.error("Exception occurs: ", e);
-        	mav.addObject("errmsg", msg.getMessage("msg.invalid.json",
-        			new String[] { e.getMessage() }, null, locale));
+            log.error("Exception occurs: ", e);
+            mav.addObject("errmsg", msg.getMessage("msg.invalid.json",
+                    new String[] { e.getMessage() }, null, locale));
         }
     }
 }
